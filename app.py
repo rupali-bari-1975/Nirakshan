@@ -32,7 +32,7 @@ activity_list = [
 ]
 
 # GitHub CSV URL (replace with your repository's raw URL)
-CSV_URL = "https://raw.githubusercontent.com/yourusername/activity-tracker/main/data/activities.csv"
+CSV_URL = "https://raw.githubusercontent.com/rupali-bari-1975/Nirakshan/refs/heads/main/data/activities.csv"
 
 # Load dataset
 @st.cache_data
