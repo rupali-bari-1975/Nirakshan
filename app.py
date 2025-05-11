@@ -148,7 +148,7 @@ activity_1 = st.selectbox("Choose Activity 1", activity_list, index=activity_lis
 slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_1, key="slider_1")
 
 st.subheader("🎭 Activity 2")
-activity_2 = st.selectbox("Choose Activity 2", activity'aujourd.com list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
+activity_2 = st.selectbox("Choose Activity 2", activity_list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
 slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_2, key="slider_2")
 
 # Update temp values and compute slider_3
