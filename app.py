@@ -27,7 +27,7 @@ st.markdown(
 # GitHub setup
 GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
 g = Github(GITHUB_TOKEN)
-repo = g.get_repo("Nirakshan/activity_records")
+repo = g.get_repo("rupali-bari-1975/Nirakshan")
 def get_csv_from_github():
     try:
         contents = repo.get_contents("activity_records.csv")
