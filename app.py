@@ -136,25 +136,39 @@ st.title("📝 Add or View My Activities 📝")
 yesterday = datetime.today().date() - timedelta(days=1)
 selected_date = st.date_input("📅 Pick a Date", value=yesterday, max_value=yesterday)
 
+# Compute slider values to ensure sum = 100
+if "temp_slider_1" not in st.session_state:
+    st.session_state.temp_slider_1 = st.session_state.loaded_slider_1
+if "temp_slider_2" not in st.session_state:
+    st.session_state.temp_slider_2 = st.session_state.loaded_slider_2
+
 # Activity inputs with loaded defaults
 st.subheader("🎨 Activity 1")
 activity_1 = st.selectbox("Choose Activity 1", activity_list, index=activity_list.index(st.session_state.loaded_activity_1), key="activity_1")
-slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_1, key="slider_1")
+slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_1, key="slider_1")
 
 st.subheader("🎭 Activity 2")
 activity_2 = st.selectbox("Choose Activity 2", activity_list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
-slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_2, key="slider_2")
+slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_2, key="slider_2")
+
+# Update temp values and compute slider_3
+if slider_1 != st.session_state.temp_slider_1:
+    st.session_state.temp_slider_1 = slider_1
+    if slider_1 + st.session_state.temp_slider_2 > 100:
+        st.session_state.temp_slider_2 = 100 - slider_1
+    st.experimental_rerun()
+elif slider_2 != st.session_state.temp_slider_2:
+    st.session_state.temp_slider_2 = slider_2
+    if st.session_state.temp_slider_1 + slider_2 > 100:
+        st.session_state.temp_slider_1 = 100 - slider_2
+    st.experimental_rerun()
+
+# Compute slider_3
+slider_3 = 100 - st.session_state.temp_slider_1 - st.session_state.temp_slider_2
 
 st.subheader("🎶 Activity 3")
 activity_3 = st.selectbox("Choose Activity 3", activity_list, index=activity_list.index(st.session_state.loaded_activity_3), key="activity_3")
-slider_3 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_3, key="slider_3", disabled=True)
-
-# Ensure sliders sum to 100
-if slider_1 + slider_2 > 100:
-    slider_2 = 100 - slider_1
-    st.session_state.slider_2 = slider_2
-slider_3 = 100 - slider_1 - slider_2
-st.session_state.slider_3 = slider_3
+st.slider("How much time (%)?", 0, 100, slider_3, key="slider_3", disabled=True)
 
 # Note input
 note = st.text_area("📜 Note (max 500 characters)", value=st.session_state.loaded_note, max_chars=500, height=100, key="note")
@@ -185,7 +199,7 @@ if submit_button:
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     write_csv_to_github(df)
     st.success("Activity saved successfully! 🌈")
-    # Reset loaded values to current
+    # Update loaded values
     st.session_state.loaded_activity_1 = activity_1
     st.session_state.loaded_slider_1 = slider_1
     st.session_state.loaded_activity_2 = activity_2
@@ -193,6 +207,9 @@ if submit_button:
     st.session_state.loaded_activity_3 = activity_3
     st.session_state.loaded_slider_3 = slider_3
     st.session_state.loaded_note = note
+    st.session_state.temp_slider_1 = slider_1
+    st.session_state.temp_slider_2 = slider_2
+    st.session_state.loaded = True
 
 # Load activity
 if load_button:
@@ -206,6 +223,8 @@ if load_button:
         st.session_state.loaded_activity_3 = entry.iloc[0]["Activity_3"]
         st.session_state.loaded_slider_3 = int(entry.iloc[0]["Activity_3_proportion"])
         st.session_state.loaded_note = entry.iloc[0]["Note"]
+        st.session_state.temp_slider_1 = st.session_state.loaded_slider_1
+        st.session_state.temp_slider_2 = st.session_state.loaded_slider_2
         st.session_state.loaded = True
         st.success("Activity loaded successfully! 🌟")
         st.experimental_rerun()
@@ -219,7 +238,10 @@ if load_button:
         st.session_state.loaded_activity_3 = activity_list[2]
         st.session_state.loaded_slider_3 = 25
         st.session_state.loaded_note = ""
+        st.session_state.temp_slider_1 = 50
+        st.session_state.temp_slider_2 = 25
         st.session_state.loaded = False
+        st.experimental_rerun()
 
 # Download CSV
 if download_button:
