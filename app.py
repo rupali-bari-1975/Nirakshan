@@ -61,6 +61,17 @@ def write_csv_to_github(df):
     except:
         repo.create_file(CSV_FILE, "Create activity_records.csv", csv_content)
 
+# Initialize session state for loaded values
+if "loaded" not in st.session_state:
+    st.session_state.loaded = False
+    st.session_state.loaded_activity_1 = activity_list[0]
+    st.session_state.loaded_slider_1 = 50
+    st.session_state.loaded_activity_2 = activity_list[1]
+    st.session_state.loaded_slider_2 = 25
+    st.session_state.loaded_activity_3 = activity_list[2]
+    st.session_state.loaded_slider_3 = 25
+    st.session_state.loaded_note = ""
+
 # Upper Section: Pie Chart
 st.title("🌟 My Activity Pie Chart 🌟")
 time_options = ["Last Week", "Last Month", "Last 2 Months", "Last 6 Months", "Last Year", "All Records"]
@@ -125,46 +136,28 @@ st.title("📝 Add or View My Activities 📝")
 yesterday = datetime.today().date() - timedelta(days=1)
 selected_date = st.date_input("📅 Pick a Date", value=yesterday, max_value=yesterday)
 
-# Initialize session state for sliders
-if "slider_1" not in st.session_state:
-    st.session_state.slider_1 = 50
-if "slider_2" not in st.session_state:
-    st.session_state.slider_2 = 25
-if "slider_3" not in st.session_state:
-    st.session_state.slider_3 = 25
-
-# Callback functions for sliders
-def update_slider_1():
-    remaining = 100 - st.session_state.slider_1
-    if remaining >= st.session_state.slider_2:
-        st.session_state.slider_3 = remaining - st.session_state.slider_2
-    else:
-        st.session_state.slider_2 = remaining
-        st.session_state.slider_3 = 0
-
-def update_slider_2():
-    remaining = 100 - st.session_state.slider_2
-    if remaining >= st.session_state.slider_1:
-        st.session_state.slider_3 = remaining - st.session_state.slider_1
-    else:
-        st.session_state.slider_1 = remaining
-        st.session_state.slider_3 = 0
-
-# Activity inputs
+# Activity inputs with loaded defaults
 st.subheader("🎨 Activity 1")
-activity_1 = st.selectbox("Choose Activity 1", activity_list, key="activity_1")
-slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.slider_1, key="slider_1", on_change=update_slider_1)
+activity_1 = st.selectbox("Choose Activity 1", activity_list, index=activity_list.index(st.session_state.loaded_activity_1), key="activity_1")
+slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_1, key="slider_1")
 
 st.subheader("🎭 Activity 2")
-activity_2 = st.selectbox("Choose Activity 2", activity_list, key="activity_2")
-slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.slider_2, key="slider_2", on_change=update_slider_2)
+activity_2 = st.selectbox("Choose Activity 2", activity_list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
+slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_2, key="slider_2")
 
 st.subheader("🎶 Activity 3")
-activity_3 = st.selectbox("Choose Activity 3", activity_list, key="activity_3")
-slider_3 = st.slider("How much time (%)?", 0, 100, st.session_state.slider_3, key="slider_3", disabled=True)
+activity_3 = st.selectbox("Choose Activity 3", activity_list, index=activity_list.index(st.session_state.loaded_activity_3), key="activity_3")
+slider_3 = st.slider("How much time (%)?", 0, 100, st.session_state.loaded_slider_3, key="slider_3", disabled=True)
 
-# Note input (supports Indian languages like Gujarati)
-note = st.text_area("📜 Note (max 500 characters)", max_chars=500, height=100)
+# Ensure sliders sum to 100
+if slider_1 + slider_2 > 100:
+    slider_2 = 100 - slider_1
+    st.session_state.slider_2 = slider_2
+slider_3 = 100 - slider_1 - slider_2
+st.session_state.slider_3 = slider_3
+
+# Note input
+note = st.text_area("📜 Note (max 500 characters)", value=st.session_state.loaded_note, max_chars=500, height=100, key="note")
 
 # Buttons
 col1, col2, col3 = st.columns(3)
@@ -192,23 +185,41 @@ if submit_button:
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     write_csv_to_github(df)
     st.success("Activity saved successfully! 🌈")
+    # Reset loaded values to current
+    st.session_state.loaded_activity_1 = activity_1
+    st.session_state.loaded_slider_1 = slider_1
+    st.session_state.loaded_activity_2 = activity_2
+    st.session_state.loaded_slider_2 = slider_2
+    st.session_state.loaded_activity_3 = activity_3
+    st.session_state.loaded_slider_3 = slider_3
+    st.session_state.loaded_note = note
 
 # Load activity
 if load_button:
     df = read_csv_from_github()
     entry = df[df["Date"] == selected_date.strftime("%Y-%m-%d")]
     if not entry.empty:
-        st.session_state.activity_1 = entry.iloc[0]["Activity_1"]
-        st.session_state.slider_1 = int(entry.iloc[0]["Activity_1_proportion"])
-        st.session_state.activity_2 = entry.iloc[0]["Activity_2"]
-        st.session_state.slider_2 = int(entry.iloc[0]["Activity_2_proportion"])
-        st.session_state.activity_3 = entry.iloc[0]["Activity_3"]
-        st.session_state.slider_3 = int(entry.iloc[0]["Activity_3_proportion"])
-        st.session_state.note = entry.iloc[0]["Note"]
+        st.session_state.loaded_activity_1 = entry.iloc[0]["Activity_1"]
+        st.session_state.loaded_slider_1 = int(entry.iloc[0]["Activity_1_proportion"])
+        st.session_state.loaded_activity_2 = entry.iloc[0]["Activity_2"]
+        st.session_state.loaded_slider_2 = int(entry.iloc[0]["Activity_2_proportion"])
+        st.session_state.loaded_activity_3 = entry.iloc[0]["Activity_3"]
+        st.session_state.loaded_slider_3 = int(entry.iloc[0]["Activity_3_proportion"])
+        st.session_state.loaded_note = entry.iloc[0]["Note"]
+        st.session_state.loaded = True
         st.success("Activity loaded successfully! 🌟")
         st.experimental_rerun()
     else:
         st.error("Entry corresponding to this date is missing.")
+        # Reset to defaults
+        st.session_state.loaded_activity_1 = activity_list[0]
+        st.session_state.loaded_slider_1 = 50
+        st.session_state.loaded_activity_2 = activity_list[1]
+        st.session_state.loaded_slider_2 = 25
+        st.session_state.loaded_activity_3 = activity_list[2]
+        st.session_state.loaded_slider_3 = 25
+        st.session_state.loaded_note = ""
+        st.session_state.loaded = False
 
 # Download CSV
 if download_button:
