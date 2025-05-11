@@ -1,11 +1,18 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import datetime, timedelta, date
 import io
 
+# Try to import matplotlib with error handling
+try:
+    import matplotlib.pyplot as plt
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    st.warning("Matplotlib is not available. Pie charts will be disabled.")
+
 # Configuration
-st.set_page_config(page_title="Activity Tracker", page_icon="✳️", layout="wide")
+st.set_page_config(page_title="Activity Tracker", page_icon="🌸", layout="wide")
 
 # Constants
 DATA_FILE = "activity_data.csv"
@@ -54,6 +61,10 @@ def save_data(df):
 
 # Pie chart function
 def create_pie_chart(df, time_period):
+    if not MATPLOTLIB_AVAILABLE:
+        st.warning("Pie charts are disabled because matplotlib is not available.")
+        return None
+        
     now = datetime.now().date()
     
     if time_period == "last week":
@@ -78,7 +89,6 @@ def create_pie_chart(df, time_period):
     
     # Combine all activity proportions
     activities = []
-    proportions = []
     
     for i in range(1, 4):
         activity_col = f"Activity {i}"
@@ -130,47 +140,56 @@ def create_pie_chart(df, time_period):
 
 # Function to update sliders with constraints
 def update_sliders(changed_slider):
-    total = st.session_state.slider1 + st.session_state.slider2 + st.session_state.slider3
+    # Get current values
+    s1 = st.session_state.slider1
+    s2 = st.session_state.slider2
+    s3 = st.session_state.slider3
     
-    if total != 100:
-        diff = 100 - total
-        
-        if changed_slider == 1:  # Slider 1 changed
-            # First try to adjust slider3
-            new_slider3 = st.session_state.slider3 + diff
-            if new_slider3 >= 0 and new_slider3 <= 100:
-                st.session_state.slider3 = new_slider3
-            else:
-                # Then adjust slider2 with remaining difference
-                remaining_diff = diff - (new_slider3 - st.session_state.slider3)
-                st.session_state.slider2 += remaining_diff
-                # Ensure slider2 stays within bounds
-                if st.session_state.slider2 < 0:
-                    st.session_state.slider2 = 0
-                elif st.session_state.slider2 > 100:
-                    st.session_state.slider2 = 100
-                # Recalculate slider3
-                st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
-        
-        elif changed_slider == 2:  # Slider 2 changed
-            # First try to adjust slider3
-            new_slider3 = st.session_state.slider3 + diff
-            if new_slider3 >= 0 and new_slider3 <= 100:
-                st.session_state.slider3 = new_slider3
-            else:
-                # Then adjust slider1 with remaining difference
-                remaining_diff = diff - (new_slider3 - st.session_state.slider3)
-                st.session_state.slider1 += remaining_diff
-                # Ensure slider1 stays within bounds
-                if st.session_state.slider1 < 0:
-                    st.session_state.slider1 = 0
-                elif st.session_state.slider1 > 100:
-                    st.session_state.slider1 = 100
-                # Recalculate slider3
-                st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
+    # Calculate total and difference
+    total = s1 + s2 + s3
+    diff = total - 100
+    
+    if diff == 0:
+        return  # No adjustment needed
+    
+    if changed_slider == 1:  # Slider 1 changed
+        # First try to adjust slider3
+        if s3 - diff >= 0 and s3 - diff <= 100:
+            st.session_state.slider3 = s3 - diff
+        else:
+            # Then adjust slider2 with remaining difference
+            remaining_diff = diff - (s3 - st.session_state.slider3)
+            st.session_state.slider2 = s2 - remaining_diff
+            # Ensure slider2 stays within bounds
+            st.session_state.slider2 = max(0, min(100, st.session_state.slider2))
+            # Recalculate slider3
+            st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
+    
+    elif changed_slider == 2:  # Slider 2 changed
+        # First try to adjust slider3
+        if s3 - diff >= 0 and s3 - diff <= 100:
+            st.session_state.slider3 = s3 - diff
+        else:
+            # Then adjust slider1 with remaining difference
+            remaining_diff = diff - (s3 - st.session_state.slider3)
+            st.session_state.slider1 = s1 - remaining_diff
+            # Ensure slider1 stays within bounds
+            st.session_state.slider1 = max(0, min(100, st.session_state.slider1))
+            # Recalculate slider3
+            st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
+    
+    # Final check to ensure all values are within bounds
+    st.session_state.slider1 = max(0, min(100, st.session_state.slider1))
+    st.session_state.slider2 = max(0, min(100, st.session_state.slider2))
+    st.session_state.slider3 = max(0, min(100, st.session_state.slider3))
+    
+    # Final adjustment to ensure sum is exactly 100
+    current_sum = st.session_state.slider1 + st.session_state.slider2 + st.session_state.slider3
+    if current_sum != 100:
+        st.session_state.slider3 += (100 - current_sum)
 
 # Upper Section - Pie Chart
-st.title("☘️ My Activity Tracker")
+st.title("🌸 My Activity Tracker")
 st.header("Activity Distribution")
 
 # Time period selection
@@ -179,11 +198,15 @@ selected_period = st.selectbox("Select time period:", time_periods, index=0)
 
 # Load data and display pie chart
 df = load_data()
-pie_chart = create_pie_chart(df, selected_period)
-if pie_chart:
-    st.pyplot(pie_chart)
+if MATPLOTLIB_AVAILABLE:
+    pie_chart = create_pie_chart(df, selected_period)
+    if pie_chart:
+        st.pyplot(pie_chart)
+    else:
+        st.info("No data available to display the pie chart.")
 else:
-    st.info("No data available to display the pie chart.")
+    st.info("Pie chart functionality is not available. Showing data table instead.")
+    st.dataframe(df)
 
 # Lower Section - Activity Tracking
 st.header("Track Your Activities")
@@ -228,7 +251,7 @@ activity3 = st.selectbox("Activity 3:", ACTIVITY_LIST, index=2)
 st.session_state.slider3 = st.slider(
     "Activity 3 Proportion:", 
     min_value=0, max_value=100, value=st.session_state.slider3, 
-    key="slider3_key",  # Fixed typo in key name
+    key="slider3_key",
     disabled=True
 )
 
@@ -271,9 +294,10 @@ with col1:
         df = save_data(df)
         
         # Update pie chart
-        pie_chart = create_pie_chart(df, selected_period)
-        if pie_chart:
-            st.pyplot(pie_chart)
+        if MATPLOTLIB_AVAILABLE:
+            pie_chart = create_pie_chart(df, selected_period)
+            if pie_chart:
+                st.pyplot(pie_chart)
 
 with col2:
     if st.button("Load Activity"):
