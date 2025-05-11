@@ -1,224 +1,318 @@
 import streamlit as st
 import pandas as pd
-import os
-from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta, date
+import io
 
-# Set page configuration
-st.set_page_config(
-    page_title="🌸 My Daily Activities",
-    page_icon="🌸",
-    layout="wide"
-)
+# Configuration
+st.set_page_config(page_title="Activity Tracker", page_icon="✳️", layout="wide")
 
-# Define activities (kid-friendly options)
-activities = [
-    "Playing", "Reading", "Drawing", "Dancing", "Singing",
-    "Math", "Science", "Story Time", "Outdoor Play", "Puzzle",
-    "Craft", "Coding", "Yoga", "Music", "Painting",
-    "Gardening", "Cooking", "Cleaning", "Helping", "TV Time",
-    "Sleeping", "Eating", "Bathing", "Traveling", "Other Fun"
+# Constants
+DATA_FILE = "activity_data.csv"
+ACTIVITY_LIST = [
+    "Playing", "Drawing", "Reading", "Cooking", "Dancing", 
+    "Singing", "Research", "Traveling", "Swimming", "Cycling",
+    "Painting", "Crafting", "Gardening", "Watching TV", "Puzzle Solving",
+    "Building Blocks", "Story Telling", "Photography", "Yoga", "Meditation",
+    "Science Experiments", "Music Practice", "Language Learning", "Math Practice", "Writing"
 ]
 
-# File path for data storage
-DATA_FILE = "daily_check.csv"
-
-# Function to load data
-def load_data():
-    if os.path.exists(DATA_FILE):
+# Initialize data file if it doesn't exist
+def init_data_file():
+    columns = [
+        "Date", 
+        "Activity 1", "Activity 1 proportion", 
+        "Activity 2", "Activity 2 proportion", 
+        "Activity 3", "Activity 3 proportion", 
+        "Note"
+    ]
+    try:
         df = pd.read_csv(DATA_FILE)
-    else:
-        df = pd.DataFrame(columns=[
-            'date', 'Activity 1', 'Activity 1 proportion',
-            'Activity 2', 'Activity 2 proportion',
-            'Activity 3', 'Activity 3 proportion', 'Note'
-        ])
-    
-    # Convert date column to datetime
-    if 'date' in df.columns:
-        df['date'] = pd.to_datetime(df['date']).dt.date
+        # Ensure all columns exist
+        for col in columns:
+            if col not in df.columns:
+                df[col] = "" if col == "Note" else 0
+        df.to_csv(DATA_FILE, index=False)
+    except:
+        df = pd.DataFrame(columns=columns)
+        df.to_csv(DATA_FILE, index=False)
+
+# Load data from CSV
+def load_data():
+    try:
+        df = pd.read_csv(DATA_FILE)
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        return df.sort_values('Date')
+    except:
+        return pd.DataFrame()
+
+# Save data to CSV
+def save_data(df):
+    df = df.sort_values('Date')
+    df.to_csv(DATA_FILE, index=False)
     return df
 
-# Function to save data
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
-
-# Function to get time periods
-def get_time_period_data(df, period):
-    today = datetime.now().date()
+# Pie chart function
+def create_pie_chart(df, time_period):
+    now = datetime.now().date()
     
-    if period == "Last Week":
-        start_date = today - timedelta(days=7)
-    elif period == "Last Month":
-        start_date = today - timedelta(days=30)
-    elif period == "Last 6 Months":
-        start_date = today - timedelta(days=180)
-    elif period == "Last Year":
-        start_date = today - timedelta(days=365)
-    else:  # All Data
-        return df
+    if time_period == "last week":
+        start_date = now - timedelta(days=7)
+    elif time_period == "last month":
+        start_date = now - timedelta(days=30)
+    elif time_period == "last 2 months":
+        start_date = now - timedelta(days=60)
+    elif time_period == "last 6 months":
+        start_date = now - timedelta(days=180)
+    elif time_period == "last year":
+        start_date = now - timedelta(days=365)
+    else:  # all records
+        start_date = df['Date'].min() if not df.empty else now
     
-    return df[df['date'] >= start_date]
-
-# Function to calculate activity percentages
-def calculate_percentages(df):
-    activity_totals = {}
+    # Convert both to datetime.date for comparison
+    filtered_df = df[df['Date'] >= start_date] if not df.empty else pd.DataFrame()
+    
+    if filtered_df.empty:
+        st.warning("No data available for the selected time period.")
+        return None
+    
+    # Combine all activity proportions
+    activities = []
+    proportions = []
     
     for i in range(1, 4):
-        for _, row in df.iterrows():
-            activity = row[f'Activity {i}']
-            proportion = row[f'Activity {i} proportion']
-            activity_totals[activity] = activity_totals.get(activity, 0) + proportion
+        activity_col = f"Activity {i}"
+        prop_col = f"Activity {i} proportion"
+        
+        temp_df = filtered_df[[activity_col, prop_col]].copy()
+        temp_df.columns = ['Activity', 'Proportion']
+        activities.append(temp_df)
     
-    total_time = sum(activity_totals.values()) or 1  # Avoid division by zero
-    return {k: (v / total_time * 100) for k, v in activity_totals.items()}
-
-# Main App
-st.title("🌸 My Daily Activities")
-
-# Section 1: Activity Summary
-st.header("Activity Summary")
-
-# Time period selection
-time_period = st.selectbox(
-    "Show activities from:",
-    ["All Data", "Last Week", "Last Month", "Last 6 Months", "Last Year"],
-    index=0
-)
-
-# Load and filter data
-df = load_data()
-filtered_df = get_time_period_data(df, time_period)
-
-# Show activity percentages
-percentages = calculate_percentages(filtered_df)
-if percentages:
-    st.subheader("Time Spent on Activities")
-    for activity, percent in sorted(percentages.items(), key=lambda x: -x[1]):
-        if percent >= 1:  # Only show activities with at least 1%
-            st.progress(int(percent), text=f"{activity}: {percent:.1f}%")
-else:
-    st.info("No activity data available yet!")
-
-# Section 2: Daily Entry
-st.header("Daily Entry")
-
-# Date picker
-selected_date = st.date_input(
-    "Select Date:",
-    value=datetime.now().date() - timedelta(days=1),
-    max_value=datetime.now().date() - timedelta(days=1),
-    key="date_picker"
-)
-
-# Check for existing entry
-existing_entry = df[df['date'] == selected_date]
-
-# Initialize form state
-if 'form' not in st.session_state:
-    st.session_state.form = {
-        'activities': [activities[0], activities[1], activities[2]],
-        'proportions': [33, 33, 34],
-        'note': ''
-    }
-
-# Load existing entry if found
-if not existing_entry.empty:
-    entry = existing_entry.iloc[0]
-    st.session_state.form = {
-        'activities': [
-            entry['Activity 1'],
-            entry['Activity 2'],
-            entry['Activity 3']
-        ],
-        'proportions': [
-            entry['Activity 1 proportion'],
-            entry['Activity 2 proportion'],
-            entry['Activity 3 proportion']
-        ],
-        'note': entry.get('Note', '')
-    }
-
-# Activity entry form
-with st.form("daily_form"):
-    st.subheader("Today's Activities")
+    combined = pd.concat(activities)
+    activity_sum = combined.groupby('Activity')['Proportion'].sum().reset_index()
+    activity_sum = activity_sum[activity_sum['Proportion'] > 0]
     
-    proportions = []
-    for i in range(3):
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            activity = st.selectbox(
-                f"Activity {i+1}",
-                activities,
-                index=activities.index(st.session_state.form['activities'][i]),
-                key=f'act_{i}'
-            )
-        with col2:
-            max_val = 100 - sum(proportions) if i < 2 else 100 - sum(proportions)
-            proportion = st.slider(
-                "Percentage",
-                min_value=0,
-                max_value=max_val,
-                value=st.session_state.form['proportions'][i],
-                key=f'prop_{i}'
-            )
-            proportions.append(proportion)
+    if activity_sum.empty:
+        st.warning("No activity data available.")
+        return None
     
-    # Note field
-    note = st.text_area(
-        "Notes (max 500 characters, any language):",
-        value=st.session_state.form['note'],
-        max_chars=500
+    # Sort and limit to top 10
+    activity_sum = activity_sum.sort_values('Proportion', ascending=False)
+    activity_sum = activity_sum.head(10)
+    
+    # Calculate percentages and filter out <1%
+    total = activity_sum['Proportion'].sum()
+    activity_sum['Percentage'] = (activity_sum['Proportion'] / total * 100).round(1)
+    activity_sum = activity_sum[activity_sum['Percentage'] >= 1]
+    
+    if activity_sum.empty:
+        st.warning("No activities with significant proportions.")
+        return None
+    
+    # Create pie chart
+    fig, ax = plt.subplots(figsize=(8, 8))
+    colors = plt.cm.tab20.colors  # Bright colors
+    
+    wedges, texts, autotexts = ax.pie(
+        activity_sum['Proportion'],
+        labels=activity_sum['Activity'],
+        autopct='%1.1f%%',
+        startangle=90,
+        colors=colors,
+        textprops={'fontsize': 10}
     )
     
-    # Form buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        save_btn = st.form_submit_button("💾 Save My Day")
-    with col2:
-        reset_btn = st.form_submit_button("🔄 Reset Form")
+    ax.axis('equal')  # Equal aspect ratio ensures pie is drawn as a circle
+    plt.title(f"Activity Distribution ({time_period})", fontsize=14)
+    plt.tight_layout()
+    
+    return fig
 
-# Handle form submission
-if save_btn:
-    # Create/update entry
-    new_entry = {
-        'date': selected_date,
-        'Activity 1': st.session_state.act_0,
-        'Activity 1 proportion': st.session_state.prop_0,
-        'Activity 2': st.session_state.act_1,
-        'Activity 2 proportion': st.session_state.prop_1,
-        'Activity 3': st.session_state.act_2,
-        'Activity 3 proportion': st.session_state.prop_2,
-        'Note': note if note.strip() else existing_entry.get('Note', '').iloc[0] if not existing_entry.empty else ''
-    }
+# Function to update sliders with constraints
+def update_sliders(changed_slider):
+    total = st.session_state.slider1 + st.session_state.slider2 + st.session_state.slider3
     
-    # Update DataFrame
-    if not existing_entry.empty:
-        df.loc[df['date'] == selected_date, list(new_entry.keys())] = list(new_entry.values())
-    else:
-        df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-    
-    # Save data
-    save_data(df)
-    st.success("Saved successfully! Great job today! 👏")
-    
-if reset_btn:
-    st.session_state.form = {
-        'activities': [activities[0], activities[1], activities[2]],
-        'proportions': [33, 33, 34],
-        'note': ''
-    }
-    st.rerun()
+    if total != 100:
+        diff = 100 - total
+        
+        if changed_slider == 1:  # Slider 1 changed
+            # First try to adjust slider3
+            new_slider3 = st.session_state.slider3 + diff
+            if new_slider3 >= 0 and new_slider3 <= 100:
+                st.session_state.slider3 = new_slider3
+            else:
+                # Then adjust slider2 with remaining difference
+                remaining_diff = diff - (new_slider3 - st.session_state.slider3)
+                st.session_state.slider2 += remaining_diff
+                # Ensure slider2 stays within bounds
+                if st.session_state.slider2 < 0:
+                    st.session_state.slider2 = 0
+                elif st.session_state.slider2 > 100:
+                    st.session_state.slider2 = 100
+                # Recalculate slider3
+                st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
+        
+        elif changed_slider == 2:  # Slider 2 changed
+            # First try to adjust slider3
+            new_slider3 = st.session_state.slider3 + diff
+            if new_slider3 >= 0 and new_slider3 <= 100:
+                st.session_state.slider3 = new_slider3
+            else:
+                # Then adjust slider1 with remaining difference
+                remaining_diff = diff - (new_slider3 - st.session_state.slider3)
+                st.session_state.slider1 += remaining_diff
+                # Ensure slider1 stays within bounds
+                if st.session_state.slider1 < 0:
+                    st.session_state.slider1 = 0
+                elif st.session_state.slider1 > 100:
+                    st.session_state.slider1 = 100
+                # Recalculate slider3
+                st.session_state.slider3 = 100 - st.session_state.slider1 - st.session_state.slider2
 
-# Add some styling
-st.markdown("""
-<style>
-    [data-testid="stForm"] {
-        background-color: #f8f9fa;
-        padding: 20px;
-        border-radius: 10px;
-    }
-    .stProgress > div > div > div > div {
-        background-color: #ff6b6b;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Upper Section - Pie Chart
+st.title("☘️ My Activity Tracker")
+st.header("Activity Distribution")
+
+# Time period selection
+time_periods = ["all records", "last week", "last month", "last 2 months", "last 6 months", "last year"]
+selected_period = st.selectbox("Select time period:", time_periods, index=0)
+
+# Load data and display pie chart
+df = load_data()
+pie_chart = create_pie_chart(df, selected_period)
+if pie_chart:
+    st.pyplot(pie_chart)
+else:
+    st.info("No data available to display the pie chart.")
+
+# Lower Section - Activity Tracking
+st.header("Track Your Activities")
+
+# Date picker (only past dates, default yesterday)
+today = date.today()
+yesterday = today - timedelta(days=1)
+selected_date = st.date_input(
+    "Select Date:", 
+    value=yesterday,
+    max_value=yesterday,
+    help="Only past dates are allowed"
+)
+
+# Initialize session state for sliders if not already done
+if 'slider1' not in st.session_state:
+    st.session_state.slider1 = 50
+if 'slider2' not in st.session_state:
+    st.session_state.slider2 = 25
+if 'slider3' not in st.session_state:
+    st.session_state.slider3 = 25
+
+# Activity selection and sliders
+activity1 = st.selectbox("Activity 1:", ACTIVITY_LIST, index=0)
+st.session_state.slider1 = st.slider(
+    "Activity 1 Proportion:", 
+    min_value=0, max_value=100, value=st.session_state.slider1, 
+    key="slider1_key",
+    on_change=update_sliders, args=(1,)
+)
+
+activity2 = st.selectbox("Activity 2:", ACTIVITY_LIST, index=1)
+st.session_state.slider2 = st.slider(
+    "Activity 2 Proportion:", 
+    min_value=0, max_value=100, value=st.session_state.slider2, 
+    key="slider2_key",
+    on_change=update_sliders, args=(2,)
+)
+
+activity3 = st.selectbox("Activity 3:", ACTIVITY_LIST, index=2)
+# Third slider is read-only (controlled by the other two)
+st.session_state.slider3 = st.slider(
+    "Activity 3 Proportion:", 
+    min_value=0, max_value=100, value=st.session_state.slider3, 
+    key="slider3_key",  # Fixed typo in key name
+    disabled=True
+)
+
+# Note textbox
+note = st.text_area("Note:", max_chars=500, help="You can write in any Indian language")
+
+# Buttons layout
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("Submit Activity"):
+        # Create new row or update existing one
+        new_row = {
+            "Date": selected_date,
+            "Activity 1": activity1,
+            "Activity 1 proportion": st.session_state.slider1,
+            "Activity 2": activity2,
+            "Activity 2 proportion": st.session_state.slider2,
+            "Activity 3": activity3,
+            "Activity 3 proportion": st.session_state.slider3,
+            "Note": note
+        }
+        
+        df = load_data()
+        
+        # Check if date already exists
+        existing_index = df[df['Date'] == selected_date].index
+        
+        if not existing_index.empty:
+            # Update existing row
+            for col, value in new_row.items():
+                df.at[existing_index[0], col] = value
+            st.success(f"Updated activities for {selected_date}")
+        else:
+            # Add new row
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            st.success(f"Added new activities for {selected_date}")
+        
+        # Save and reload data
+        df = save_data(df)
+        
+        # Update pie chart
+        pie_chart = create_pie_chart(df, selected_period)
+        if pie_chart:
+            st.pyplot(pie_chart)
+
+with col2:
+    if st.button("Load Activity"):
+        df = load_data()
+        entry = df[df['Date'] == selected_date]
+        
+        if not entry.empty:
+            entry = entry.iloc[0]
+            
+            # Update activity selections
+            st.session_state.activity1 = entry["Activity 1"]
+            st.session_state.activity2 = entry["Activity 2"]
+            st.session_state.activity3 = entry["Activity 3"]
+            
+            # Update slider values
+            st.session_state.slider1 = entry["Activity 1 proportion"]
+            st.session_state.slider2 = entry["Activity 2 proportion"]
+            st.session_state.slider3 = entry["Activity 3 proportion"]
+            
+            # Update note
+            st.session_state.note = entry["Note"]
+            
+            st.success(f"Loaded activities for {selected_date}")
+            
+            # Need to rerun to update UI
+            st.rerun()
+        else:
+            st.warning(f"No entry found for {selected_date}")
+
+with col3:
+    # Download button
+    df = load_data()
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="Download Records",
+        data=csv,
+        file_name="activity_records.csv",
+        mime="text/csv"
+    )
+
+# Initialize data file if it doesn't exist
+init_data_file()
