@@ -6,6 +6,7 @@ from github import Github, GithubException
 import io
 import base64
 import streamlit.components.v1 as components
+import time
 
 # Streamlit page config
 st.set_page_config(page_title="My Activity Tracker", layout="wide")
@@ -51,23 +52,33 @@ def get_csv_from_github():
             st.error(f"Error accessing CSV: {e.data.get('message', 'Unknown error')}")
             return pd.DataFrame()
 
-def save_csv_to_github(df):
-    try:
-        df = df.sort_values("Date")
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        content = csv_buffer.getvalue()
+def save_csv_to_github(df, retries=3, delay=2):
+    for attempt in range(retries):
         try:
-            contents = repo.get_contents("activity_records.csv")
-            repo.update_file(contents.path, "Update activity_records.csv", content, contents.sha)
+            df = df.sort_values("Date")
+            csv_buffer = io.StringIO()
+            df.to_csv(csv_buffer, index=False)
+            content = csv_buffer.getvalue()
+            try:
+                contents = repo.get_contents("activity_records.csv")
+                repo.update_file(contents.path, "Update activity_records.csv", content, contents.sha)
+            except GithubException as e:
+                if e.status == 404:
+                    repo.create_file("activity_records.csv", "Create activity_records.csv", content)
+                else:
+                    raise
+            return True
         except GithubException as e:
-            if e.status == 404:
-                repo.create_file("activity_records.csv", "Create activity_records.csv", content)
+            if e.status == 403 and "Resource not accessible" in e.data.get('message', ''):
+                st.error("GitHub token lacks permission to write to the repository. Please check token scopes (requires 'repo' for private repos).")
+                return False
+            elif attempt < retries - 1:
+                time.sleep(delay)  # Wait before retrying
+                continue
             else:
-                raise
-    except GithubException as e:
-        st.error(f"Error saving CSV: {e.data.get('message', 'Unknown error')}")
-        st.stop()
+                st.error(f"Error saving CSV after {retries} attempts: {e.data.get('message', 'Unknown error')}")
+                return False
+    return False
 
 # Activity list
 activity_list = [
@@ -230,8 +241,10 @@ if submit:
         df.loc[df["Date"] == selected_date.strftime("%Y-%m-%d")] = pd.Series(new_entry)
     else:
         df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-    save_csv_to_github(df)
-    st.success("Activity saved! 🎈")
+    if save_csv_to_github(df):
+        st.success("Activity saved! 🎈")
+    else:
+        st.error("Failed to save activity. Please check GitHub token permissions.")
 
 # Load Activity
 if load:
@@ -252,7 +265,7 @@ if load:
 
 # Download CSV
 if download:
-    df = get_csv_from_github()  # Fixed typo from get_csv_to_github
+    df = get_csv_from_github()
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="activity_records.csv">Download CSV File</a>'
