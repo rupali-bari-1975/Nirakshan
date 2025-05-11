@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-from github import Github
+from github import Github, GithubException
 import io
 import base64
 import streamlit.components.v1 as components
@@ -25,29 +25,49 @@ st.markdown(
 )
 
 # GitHub setup
-GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
-g = Github(GITHUB_TOKEN)
-repo = g.get_repo("rupali-bari-1975/Nirakshan")
+try:
+    GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+    g = Github(GITHUB_TOKEN)
+    repo = g.get_repo("rupali-bari-1975/Nirakshan")  # Replace with your-username/Nirakshan
+except KeyError:
+    st.error("GitHub token not found in Streamlit secrets. Please add GITHUB_TOKEN.")
+    st.stop()
+except GithubException as e:
+    st.error(f"Failed to access GitHub repository: {e.data.get('message', 'Unknown error')}")
+    st.stop()
+
 def get_csv_from_github():
     try:
         contents = repo.get_contents("activity_records.csv")
         df = pd.read_csv(io.StringIO(contents.decoded_content.decode()))
         return df
-    except:
-        return pd.DataFrame(columns=["Date", "Activity_1", "Activity_1_proportion", 
-                                     "Activity_2", "Activity_2_proportion", 
-                                     "Activity_3", "Activity_3_proportion", "Note"])
+    except GithubException as e:
+        if e.status == 404:
+            # Create empty DataFrame if file doesn't exist
+            return pd.DataFrame(columns=["Date", "Activity_1", "Activity_1_proportion", 
+                                         "Activity_2", "Activity_2_proportion", 
+                                         "Activity_3", "Activity_3_proportion", "Note"])
+        else:
+            st.error(f"Error accessing CSV: {e.data.get('message', 'Unknown error')}")
+            return pd.DataFrame()
 
 def save_csv_to_github(df):
-    df = df.sort_values("Date")
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    content = csv_buffer.getvalue()
     try:
-        contents = repo.get_contents("activity_records.csv")
-        repo.update_file(contents.path, "Update activity_records.csv", content, contents.sha)
-    except:
-        repo.create_file("activity_records.csv", "Create activity_records.csv", content)
+        df = df.sort_values("Date")
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        content = csv_buffer.getvalue()
+        try:
+            contents = repo.get_contents("activity_records.csv")
+            repo.update_file(contents.path, "Update activity_records.csv", content, contents.sha)
+        except GithubException as e:
+            if e.status == 404:
+                repo.create_file("activity_records.csv", "Create activity_records.csv", content)
+            else:
+                raise
+    except GithubException as e:
+        st.error(f"Error saving CSV: {e.data.get('message', 'Unknown error')}")
+        st.stop()
 
 # Activity list
 activity_list = [
@@ -232,7 +252,7 @@ if load:
 
 # Download CSV
 if download:
-    df = get_csv_to_github()
+    df = get_csv_from_github()  # Fixed typo from get_csv_to_github
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="activity_records.csv">Download CSV File</a>'
