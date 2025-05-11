@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta, date
 import io
+import sys
+from datetime import datetime, timedelta, date
+
+# Configuration
+st.set_page_config(page_title="Activity Tracker", page_icon="🌸", layout="wide")
 
 # Try to import matplotlib with error handling
 try:
@@ -9,10 +13,7 @@ try:
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-    st.warning("Matplotlib is not available. Pie charts will be disabled.")
-
-# Configuration
-st.set_page_config(page_title="Activity Tracker", page_icon="🌸", layout="wide")
+    st.warning("Pie charts are disabled because matplotlib is not available.")
 
 # Constants
 DATA_FILE = "activity_data.csv"
@@ -59,7 +60,7 @@ def save_data(df):
     df.to_csv(DATA_FILE, index=False)
     return df
 
-# Pie chart function
+# Pie chart function with proper spacing
 def create_pie_chart(df, time_period):
     if not MATPLOTLIB_AVAILABLE:
         st.warning("Pie charts are disabled because matplotlib is not available.")
@@ -119,8 +120,8 @@ def create_pie_chart(df, time_period):
         st.warning("No activities with significant proportions.")
         return None
     
-    # Create pie chart
-    fig, ax = plt.subplots(figsize=(8, 8))
+    # Create pie chart with proper spacing
+    fig, ax = plt.subplots(figsize=(10, 10))
     colors = plt.cm.tab20.colors  # Bright colors
     
     wedges, texts, autotexts = ax.pie(
@@ -129,12 +130,16 @@ def create_pie_chart(df, time_period):
         autopct='%1.1f%%',
         startangle=90,
         colors=colors,
-        textprops={'fontsize': 10}
+        textprops={'fontsize': 10},
+        pctdistance=0.85,
+        labeldistance=1.05
     )
     
     ax.axis('equal')  # Equal aspect ratio ensures pie is drawn as a circle
-    plt.title(f"Activity Distribution ({time_period})", fontsize=14)
-    plt.tight_layout()
+    
+    # Add title with proper spacing
+    plt.title(f"Activity Distribution ({time_period})", fontsize=14, pad=20)
+    plt.tight_layout(pad=3.0)
     
     return fig
 
@@ -229,6 +234,10 @@ if 'slider2' not in st.session_state:
 if 'slider3' not in st.session_state:
     st.session_state.slider3 = 25
 
+# Initialize note in session state
+if 'note' not in st.session_state:
+    st.session_state.note = ""
+
 # Activity selection and sliders
 activity1 = st.selectbox("Activity 1:", ACTIVITY_LIST, index=0)
 st.session_state.slider1 = st.slider(
@@ -255,8 +264,9 @@ st.session_state.slider3 = st.slider(
     disabled=True
 )
 
-# Note textbox
-note = st.text_area("Note:", max_chars=500, help="You can write in any Indian language")
+# Note textbox - properly bound to session state
+note = st.text_area("Note:", value=st.session_state.note, max_chars=500, 
+                   help="You can write in any Indian language", key="note_area")
 
 # Buttons layout
 col1, col2, col3 = st.columns(3)
@@ -272,7 +282,7 @@ with col1:
             "Activity 2 proportion": st.session_state.slider2,
             "Activity 3": activity3,
             "Activity 3 proportion": st.session_state.slider3,
-            "Note": note
+            "Note": st.session_state.note
         }
         
         df = load_data()
@@ -317,8 +327,8 @@ with col2:
             st.session_state.slider2 = entry["Activity 2 proportion"]
             st.session_state.slider3 = entry["Activity 3 proportion"]
             
-            # Update note
-            st.session_state.note = entry["Note"]
+            # Update note - this is critical for textbox loading
+            st.session_state.note = entry["Note"] if pd.notna(entry["Note"]) else ""
             
             st.success(f"Loaded activities for {selected_date}")
             
