@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-import uuid
+import os
 
 # Child-friendly CSS
 st.markdown("""
@@ -46,7 +46,18 @@ def load_data():
         else:
             return pd.DataFrame(columns=['Date', 'Activity 1', 'Activity 1 proportion', 'Activity 2', 'Activity 2 proportion', 'Activity 3', 'Activity 3 proportion', 'Note'])
     except Exception as e:
-        st.warning(f"Error loading data: {e}")
+        st.error(f"Error loading data from GitHub: {e}. Trying local file...")
+        # Fallback to local CSV for testing
+        local_csv = 'activities.csv'
+        if os.path.exists(local_csv):
+            try:
+                df = pd.read_csv(local_csv)
+                if not df.empty:
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    df = df.dropna(subset=['Date'])
+                    return df.sort_values('Date')
+            except Exception as local_e:
+                st.error(f"Error loading local file: {local_e}")
         return pd.DataFrame(columns=['Date', 'Activity 1', 'Activity 1 proportion', 'Activity 2', 'Activity 2 proportion', 'Activity 3', 'Activity 3 proportion', 'Note'])
 
 # Save dataset to GitHub (simulated locally; requires GitHub Actions or manual push for online)
@@ -151,7 +162,7 @@ slider1 = st.slider("How much time for Activity 1? (%)", 0, 100, value=st.sessio
 st.session_state.last_slider = 'slider1'
 
 st.subheader("Activity 2")
-activity2 = st.selectbox("Choose Activity 2:", activity_list, key="act2")
+activity2 = st.selectbox("Choose Activity 2:", activity_list, key="actaction2")
 slider2 = st.slider("How much time for Activity 2? (%)", 0, 100, value=st.session_state.slider2, key="slider2", on_change=update_sliders)
 st.session_state.last_slider = 'slider2'
 
