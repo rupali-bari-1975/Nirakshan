@@ -148,7 +148,7 @@ activity_1 = st.selectbox("Choose Activity 1", activity_list, index=activity_lis
 slider_1 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_1, key="slider_1")
 
 st.subheader("🎭 Activity 2")
-activity_2 = st.selectbox("Choose Activity 2", activity_list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
+activity_2 = st.selectbox("Choose Activity 2", activity'aujourd.com list, index=activity_list.index(st.session_state.loaded_activity_2), key="activity_2")
 slider_2 = st.slider("How much time (%)?", 0, 100, st.session_state.temp_slider_2, key="slider_2")
 
 # Update temp values and compute slider_3
@@ -156,12 +156,12 @@ if slider_1 != st.session_state.temp_slider_1:
     st.session_state.temp_slider_1 = slider_1
     if slider_1 + st.session_state.temp_slider_2 > 100:
         st.session_state.temp_slider_2 = 100 - slider_1
-    st.experimental_rerun()
+    st.rerun()
 elif slider_2 != st.session_state.temp_slider_2:
     st.session_state.temp_slider_2 = slider_2
     if st.session_state.temp_slider_1 + slider_2 > 100:
         st.session_state.temp_slider_1 = 100 - slider_2
-    st.experimental_rerun()
+    st.rerun()
 
 # Compute slider_3
 slider_3 = 100 - st.session_state.temp_slider_1 - st.session_state.temp_slider_2
@@ -171,7 +171,7 @@ activity_3 = st.selectbox("Choose Activity 3", activity_list, index=activity_lis
 st.slider("How much time (%)?", 0, 100, slider_3, key="slider_3", disabled=True)
 
 # Note input
-note = st.text_area("📜 Note (max 500 characters)", value=st.session_state.loaded_note, max_chars=500, height=100, key="note")
+note = st.text_area("📜 Note (max 500 characters)", value=st.session_state.loaded_note or "", max_chars=500, height=100, key="note")
 
 # Buttons
 col1, col2, col3 = st.columns(3)
@@ -222,12 +222,13 @@ if load_button:
         st.session_state.loaded_slider_2 = int(entry.iloc[0]["Activity_2_proportion"])
         st.session_state.loaded_activity_3 = entry.iloc[0]["Activity_3"]
         st.session_state.loaded_slider_3 = int(entry.iloc[0]["Activity_3_proportion"])
-        st.session_state.loaded_note = entry.iloc[0]["Note"]
+        # Handle NaN or missing note
+        st.session_state.loaded_note = str(entry.iloc[0]["Note"]) if pd.notna(entry.iloc[0]["Note"]) else ""
         st.session_state.temp_slider_1 = st.session_state.loaded_slider_1
         st.session_state.temp_slider_2 = st.session_state.loaded_slider_2
         st.session_state.loaded = True
         st.success("Activity loaded successfully! 🌟")
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.error("Entry corresponding to this date is missing.")
         # Reset to defaults
@@ -241,7 +242,7 @@ if load_button:
         st.session_state.temp_slider_1 = 50
         st.session_state.temp_slider_2 = 25
         st.session_state.loaded = False
-        st.experimental_rerun()
+        st.rerun()
 
 # Download CSV
 if download_button:
