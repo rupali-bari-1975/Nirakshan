@@ -1,324 +1,249 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import date, timedelta
-import io
-import base64
 from github import Github
-import os
-
-# Set page config
-st.set_page_config(page_title="Activity Tracker", layout="wide")
-
-# Custom colors for the pie chart
-COLORS = [
-    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
-    '#FF9F40', '#8AC249', '#EA5F89', '#00BFFF', '#FFD700'
-]
-
-# Activity list (you can modify this as needed)
-activity_list = [
-    "Playing", "Cooking", "Drawing", "Research", "Traveling",
-    "Reading", "Dancing", "Singing", "Studying", "Sleeping",
-    "Watching TV", "Gardening", "Cycling", "Swimming", "Painting",
-    "Writing", "Coding", "Meditating", "Exercising", "Shopping",
-    "Photography", "Music", "Crafting", "Baking", "Walking"
-]
+import io
+from datetime import datetime, timedelta
+import uuid
 
 # GitHub configuration
-GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", os.getenv("GITHUB_TOKEN"))
-REPO_NAME = "Nirakshan"  # Change this to your repo name
-FILE_PATH = "activity_records.csv"
+GITHUB_TOKEN = st.secrets["GITHUB_TOKEN"]
+REPO_NAME = "Nirakshan/activity_records.csv"
+g = Github(GITHUB_TOKEN)
+repo = g.get_repo("Nirakshan")
 
-# Initialize GitHub connection
-def get_github_repo():
-    if not GITHUB_TOKEN:
-        st.error("GitHub token not found. Please set GITHUB_TOKEN in secrets.")
-        return None
-    try:
-        g = Github(GITHUB_TOKEN)
-        repo = g.get_user().get_repo(REPO_NAME)
-        return repo
-    except Exception as e:
-        st.error(f"Error connecting to GitHub: {e}")
-        return None
+# Activity list (modifiable)
+activity_list = [
+    "Playing", "Cooking", "Drawing", "Research", "Traveling", "Reading", "Painting",
+    "Singing", "Dancing", "Swimming", "Cycling", "Gardening", "Writing", "Hiking",
+    "Photography", "Yoga", "Crafting", "Puzzle Solving", "Baking", "Sewing",
+    "Knitting", "Fishing", "Bird Watching", "Stargazing", "Chess"
+]
 
-# Load data from GitHub
-def load_data_from_github():
-    repo = get_github_repo()
-    if not repo:
-        return pd.DataFrame(columns=[
-            'Date', 'Activity 1', 'Activity 1 proportion',
-            'Activity 2', 'Activity 2 proportion',
-            'Activity 3', 'Activity 3 proportion', 'Note'
-        ])
-    
+# Function to read CSV from GitHub
+def read_csv_from_github():
     try:
-        contents = repo.get_contents(FILE_PATH)
-        data = base64.b64decode(contents.content).decode('utf-8')
-        df = pd.read_csv(io.StringIO(data), parse_dates=['Date'])
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
-        df = df.sort_values('Date').reset_index(drop=True)
+        contents = repo.get_contents(REPO_NAME)
+        df = pd.read_csv(io.StringIO(contents.decoded_content.decode()))
         return df
-    except Exception as e:
-        st.warning(f"Creating new dataset: {e}")
-        return pd.DataFrame(columns=[
-            'Date', 'Activity 1', 'Activity 1 proportion',
-            'Activity 2', 'Activity 2 proportion',
-            'Activity 3', 'Activity 3 proportion', 'Note'
-        ])
-
-# Save data to GitHub
-def save_data_to_github(df):
-    repo = get_github_repo()
-    if not repo:
-        return df
-    
-    df = df.sort_values('Date').reset_index(drop=True)
-    csv_data = df.to_csv(index=False)
-    
-    try:
-        contents = repo.get_contents(FILE_PATH)
-        repo.update_file(contents.path, "Update activity records", csv_data, contents.sha)
     except:
-        repo.create_file(FILE_PATH, "Create activity records", csv_data)
-    
-    return df
+        # Create empty DataFrame if file doesn't exist
+        return pd.DataFrame(columns=[
+            "Date", "Activity_1", "Activity_1_proportion",
+            "Activity_2", "Activity_2_proportion",
+            "Activity_3", "Activity_3_proportion", "Note"
+        ])
+
+# Function to save CSV to GitHub
+def save_csv_to_github(df):
+    df = df.sort_values("Date")  # Sort by date
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    try:
+        contents = repo.get_contents(REPO_NAME)
+        repo.update_file(
+            contents.path,
+            f"Update {REPO_NAME}",
+            csv_buffer.getvalue(),
+            contents.sha
+        )
+    except:
+        repo.create_file(
+            REPO_NAME,
+            f"Create {REPO_NAME}",
+            csv_buffer.getvalue()
+        )
 
 # Function to create pie chart
-def create_pie_chart(df, time_period):
+def create_pie_chart(df, time_filter):
     # Filter data based on time period
-    today = date.today()
-    if time_period == 'last week':
+    today = datetime.now().date()
+    if time_filter == "Last Week":
         start_date = today - timedelta(days=7)
-    elif time_period == 'last month':
+    elif time_filter == "Last Month":
         start_date = today - timedelta(days=30)
-    elif time_period == 'last 2 months':
+    elif time_filter == "Last 2 Months":
         start_date = today - timedelta(days=60)
-    elif time_period == 'last 6 months':
+    elif time_filter == "Last 6 Months":
         start_date = today - timedelta(days=180)
-    elif time_period == 'last year':
+    elif time_filter == "Last Year":
         start_date = today - timedelta(days=365)
-    else:  # all records
-        start_date = df['Date'].min() if not df.empty else today
-    
-    filtered_df = df[df['Date'] >= start_date] if time_period != 'all records' else df
-    
-    # Prepare data for pie chart
-    activities = []
-    proportions = []
-    
-    # Collect all activities and their proportions
+    else:  # All Records
+        start_date = None
+
+    if start_date:
+        df = df[pd.to_datetime(df["Date"]) >= pd.to_datetime(start_date)]
+
+    # Aggregate activity proportions
+    activity_counts = {}
     for i in range(1, 4):
-        col_act = f'Activity {i}'
-        col_prop = f'Activity {i} proportion'
-        activities.extend(filtered_df[col_act].tolist())
-        proportions.extend(filtered_df[col_prop].tolist())
-    
-    if not activities:
-        st.warning("No data available for the selected time period.")
-        return
-    
-    # Create a summary dataframe
-    summary = pd.DataFrame({'Activity': activities, 'Proportion': proportions})
-    summary = summary.groupby('Activity')['Proportion'].sum().reset_index()
-    summary = summary.sort_values('Proportion', ascending=False)
-    
-    # Combine small proportions into "Others"
-    total = summary['Proportion'].sum()
-    summary['Percentage'] = summary['Proportion'] / total * 100
-    others = summary[summary['Percentage'] < 1]
-    
-    if not others.empty:
-        main = summary[summary['Percentage'] >= 1]
-        others_sum = others['Proportion'].sum()
-        others_percentage = others_sum / total * 100
-        if not main.empty:
-            main = pd.concat([main, pd.DataFrame({
-                'Activity': ['Others'],
-                'Proportion': [others_sum],
-                'Percentage': [others_percentage]
-            })])
-        summary = main
-    
-    # Limit to top 10 entries
-    summary = summary.head(10)
-    
-    # Create pie chart
-    fig, ax = plt.subplots(figsize=(8, 8))
-    patches, texts, autotexts = ax.pie(
-        summary['Proportion'],
-        labels=summary['Activity'],
-        autopct='%1.1f%%',
-        colors=COLORS[:len(summary)],
-        startangle=90,
-        pctdistance=0.85
-    )
-    
-    # Make labels more readable
-    for text in texts:
-        text.set_fontsize(12)
-    for autotext in autotexts:
-        autotext.set_fontsize(12)
-        autotext.set_color('white')
-    
-    # Equal aspect ratio ensures that pie is drawn as a circle
-    ax.axis('equal')
-    plt.title(f'Activity Distribution ({time_period.capitalize()})', pad=20)
-    
+        col = f"Activity_{i}"
+        prop_col = f"Activity_{i}_proportion"
+        for _, row in df.iterrows():
+            activity = row[col]
+            proportion = row[prop_col]
+            activity_counts[activity] = activity_counts.get(activity, 0) + proportion
+
+    # Filter activities with >= 1% and limit to top 10
+    total = sum(activity_counts.values())
+    if total == 0:
+        return None
+    activity_percentages = {
+        k: (v / total * 100) for k, v in activity_counts.items() if (v / total * 100) >= 1
+    }
+    sorted_activities = sorted(activity_percentages.items(), key=lambda x: x[1], reverse=True)[:10]
+    if not sorted_activities:
+        return None
+
+    labels, sizes = zip(*sorted_activities)
+    colors = plt.cm.Set3.colors[:len(labels)]  # Bright colors
+
+    fig, ax = plt.subplots()
+    ax.pie(sizes, labels=labels, colors=colors, autopct="%1.1f%%", startangle=90)
+    ax.axis("equal")
+    plt.title("Activity Distribution", pad=20, fontsize=14, color="navy")
+    return fig
+
+# Streamlit app layout
+st.set_page_config(page_title="Activity Tracker", page_icon="🌟", layout="centered")
+st.title("🌈 Activity Tracker for My Star 🌈", anchor=False)
+st.markdown("Track your fun activities with this colorful app! 🎉")
+
+# Upper section: Pie chart
+st.header("📊 Your Activity Chart", anchor=False)
+time_filter = st.selectbox(
+    "Select Time Period",
+    ["All Records", "Last Week", "Last Month", "Last 2 Months", "Last 6 Months", "Last Year"],
+    index=0
+)
+df = read_csv_from_github()
+fig = create_pie_chart(df, time_filter)
+if fig:
     st.pyplot(fig)
+else:
+    st.info("No data available for the selected period. Start adding activities below! 😊")
 
-# Main app
-def main():
-    st.title("🌈 My Activity Tracker")
-    
-    # Load data
-    df = load_data_from_github()
-    
-    # Upper section - Pie chart
-    with st.container():
-        st.header("Activity Summary")
-        time_period = st.selectbox(
-            "Select time period:",
-            ["all records", "last week", "last month", "last 2 months", "last 6 months", "last year"],
-            index=0,
-            key="time_period"
-        )
-        create_pie_chart(df, time_period)
-    
-    # Lower section - Activity input
-    with st.container():
-        st.header("Daily Activity Entry")
-        
-        # Date picker (default to yesterday, only past dates allowed)
-        yesterday = date.today() - timedelta(days=1)
-        selected_date = st.date_input(
-            "Select Date:",
-            value=yesterday,
-            max_value=yesterday,
-            key="selected_date"
-        )
-        
-        # Initialize session state for slider values if not exists
-        if 'slider1' not in st.session_state:
-            st.session_state.slider1 = 50
-            st.session_state.slider2 = 25
-            st.session_state.slider3 = 25
-        
-        # Function to update sliders
-        def update_sliders(primary_slider, secondary_slider, fixed_slider, changed_slider):
-            total = st.session_state.slider1 + st.session_state.slider2 + st.session_state.slider3
-            diff = total - 100
-            
-            if diff != 0:
-                if changed_slider == primary_slider:
-                    # First try to adjust fixed_slider
-                    if st.session_state[fixed_slider] - diff >= 0:
-                        st.session_state[fixed_slider] -= diff
-                    else:
-                        remaining_diff = diff - st.session_state[fixed_slider]
-                        st.session_state[fixed_slider] = 0
-                        st.session_state[secondary_slider] -= remaining_diff
-                elif changed_slider == secondary_slider:
-                    # First try to adjust fixed_slider
-                    if st.session_state[fixed_slider] - diff >= 0:
-                        st.session_state[fixed_slider] -= diff
-                    else:
-                        remaining_diff = diff - st.session_state[fixed_slider]
-                        st.session_state[fixed_slider] = 0
-                        st.session_state[primary_slider] -= remaining_diff
-        
-        # Activity 1
-        st.subheader("Activity 1")
-        act1 = st.selectbox("Select Activity 1:", activity_list, key='act1')
-        st.session_state.slider1 = st.slider(
-            "Proportion:", 0, 100, st.session_state.slider1, key='slider1',
-            on_change=update_sliders,
-            args=('slider1', 'slider2', 'slider3', 'slider1')
-        )
-        
-        # Activity 2
-        st.subheader("Activity 2")
-        act2 = st.selectbox("Select Activity 2:", activity_list, key='act2')
-        st.session_state.slider2 = st.slider(
-            "Proportion:", 0, 100, st.session_state.slider2, key='slider2',
-            on_change=update_sliders,
-            args=('slider2', 'slider1', 'slider3', 'slider2')
-        )
-        
-        # Activity 3 (read-only slider)
-        st.subheader("Activity 3")
-        act3 = st.selectbox("Select Activity 3:", activity_list, key='act3')
-        st.session_state.slider3 = st.slider(
-            "Proportion:", 0, 100, st.session_state.slider3, key='slider3',
-            disabled=True
-        )
-        
-        # Note field
-        note = st.text_area("Note (in any Indian language):", max_chars=500, height=100, key='note')
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            # Submit button
-            if st.button("Submit Activity"):
-                # Check if date already exists
-                mask = df['Date'] == selected_date
-                if mask.any():
-                    # Update existing record
-                    df.loc[mask, [
-                        'Activity 1', 'Activity 1 proportion',
-                        'Activity 2', 'Activity 2 proportion',
-                        'Activity 3', 'Activity 3 proportion', 'Note'
-                    ]] = [
-                        act1, st.session_state.slider1,
-                        act2, st.session_state.slider2,
-                        act3, st.session_state.slider3, note
-                    ]
-                else:
-                    # Add new record
-                    new_record = pd.DataFrame([{
-                        'Date': selected_date,
-                        'Activity 1': act1,
-                        'Activity 1 proportion': st.session_state.slider1,
-                        'Activity 2': act2,
-                        'Activity 2 proportion': st.session_state.slider2,
-                        'Activity 3': act3,
-                        'Activity 3 proportion': st.session_state.slider3,
-                        'Note': note
-                    }])
-                    df = pd.concat([df, new_record], ignore_index=True)
-                
-                df = save_data_to_github(df)
-                st.success("Activity submitted successfully!")
-        
-        with col2:
-            # Load button
-            if st.button("Load Activity"):
-                mask = df['Date'] == selected_date
-                if mask.any():
-                    record = df[mask].iloc[0]
-                    st.session_state.act1 = record['Activity 1']
-                    st.session_state.act2 = record['Activity 2']
-                    st.session_state.act3 = record['Activity 3']
-                    st.session_state.slider1 = record['Activity 1 proportion']
-                    st.session_state.slider2 = record['Activity 2 proportion']
-                    st.session_state.slider3 = record['Activity 3 proportion']
-                    st.session_state.note = record['Note']
-                    st.experimental_rerun()
-                else:
-                    st.warning("No entry found for this date.")
-        
-        with col3:
-            # Download button
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Download Records",
-                data=csv,
-                file_name='activity_records.csv',
-                mime='text/csv',
-                key='download_btn'
-            )
+# Lower section: Activity input
+st.header("✨ Add Your Activities", anchor=False)
 
-if __name__ == "__main__":
-    main()
+# Date picker (past dates only)
+yesterday = datetime.now().date() - timedelta(days=1)
+selected_date = st.date_input(
+    "Select Date",
+    value=yesterday,
+    max_value=yesterday,
+    format="YYYY-MM-DD"
+)
+
+# Initialize session state for sliders
+if "slider_1" not in st.session_state:
+    st.session_state.slider_1 = 50
+    st.session_state.slider_2 = 25
+    st.session_state.slider_3 = 25
+
+# Activity 1
+st.subheader("🎮 Activity 1", anchor=False)
+activity_1 = st.selectbox("Choose Activity 1", activity_list, key="activity_1")
+slider_1 = st.slider(
+    "Proportion (%)",
+    min_value=0,
+    max_value=100,
+    value=st.session_state.slider_1,
+    step=1,
+    key="slider_1",
+    on_change=lambda: st.session_state.update({
+        "slider_3": max(0, 100 - st.session_state.slider_1 - st.session_state.slider_2),
+        "slider_2": max(0, 100 - st.session_state.slider_1 - max(0, 100 - st.session_state.slider_1 - st.session_state.slider_2))
+    })
+)
+
+# Activity 2
+st.subheader("🍳 Activity 2", anchor=False)
+activity_2 = st.selectbox("Choose Activity 2", activity_list, key="activity_2")
+slider_2 = st.slider(
+    "Proportion (%)",
+    min_value=0,
+    max_value=100,
+    value=st.session_state.slider_2,
+    step=1,
+    key="slider_2",
+    on_change=lambda: st.session_state.update({
+        "slider_3": max(0, 100 - st.session_state.slider_1 - st.session_state.slider_2),
+        "slider_1": max(0, 100 - st.session_state.slider_2 - max(0, 100 - st.session_state.slider_1 - st.session_state.slider_2))
+    })
+)
+
+# Activity 3 (non-interactive slider)
+st.subheader("🎨 Activity 3", anchor=False)
+activity_3 = st.selectbox("Choose Activity 3", activity_list, key="activity_3")
+slider_3 = st.slider(
+    "Proportion (%)",
+    min_value=0,
+    max_value=100,
+    value=100 - slider_1 - slider_2,
+    step=1,
+    key="slider_3",
+    disabled=True
+)
+
+# Note textbox
+st.subheader("📝 Note", anchor=False)
+note = st.text_area(
+    "Add a Note (max 500 characters, supports Gujarati and other Indian languages)",
+    max_chars=500,
+    height=100
+)
+
+# Buttons
+col1, col2, col3 = st.columns([1, 1, 2])
+with col1:
+    submit_button = st.button("Submit Activity")
+with col2:
+    load_button = st.button("Load Activity")
+with col3:
+    download_button = st.button("Download Records")
+
+# Submit activity
+if submit_button:
+    new_data = {
+        "Date": selected_date.strftime("%Y-%m-%d"),
+        "Activity_1": activity_1,
+        "Activity_1_proportion": slider_1,
+        "Activity_2": activity_2,
+        "Activity_2_proportion": slider_2,
+        "Activity_3": activity_3,
+        "Activity_3_proportion": slider_3,
+        "Note": note
+    }
+    df = read_csv_from_github()
+    df = df[df["Date"] != selected_date.strftime("%Y-%m-%d")]  # Remove existing entry for date
+    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
+    save_csv_to_github(df)
+    st.success("Activity saved successfully! 🎉")
+
+# Load activity
+if load_button:
+    df = read_csv_from_github()
+    entry = df[df["Date"] == selected_date.strftime("%Y-%m-%d")]
+    if not entry.empty:
+        st.session_state.activity_1 = entry["Activity_1"].iloc[0]
+        st.session_state.slider_1 = entry["Activity_1_proportion"].iloc[0]
+        st.session_state.activity_2 = entry["Activity_2"].iloc[0]
+        st.session_state.slider_2 = entry["Activity_2_proportion"].iloc[0]
+        st.session_state.activity_3 = entry["Activity_3"].iloc[0]
+        st.session_state.slider_3 = entry["Activity_3_proportion"].iloc[0]
+        st.session_state.note = entry["Note"].iloc[0]
+        st.experimental_rerun()
+    else:
+        st.warning("Entry corresponding to this date is missing. 😔")
+
+# Download CSV
+if download_button:
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    st.download_button(
+        label="Download activity_records.csv",
+        data=csv_buffer.getvalue(),
+        file_name="activity_records.csv",
+        mime="text/csv"
+    )
