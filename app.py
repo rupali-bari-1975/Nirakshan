@@ -3,6 +3,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import date, timedelta
 import io
+import base64
+from github import Github
+import os
 
 # Set page config
 st.set_page_config(page_title="Activity Tracker", layout="wide")
@@ -22,24 +25,64 @@ activity_list = [
     "Photography", "Music", "Crafting", "Baking", "Walking"
 ]
 
-# Initialize or load dataset
-@st.cache_data
-def load_data():
+# GitHub configuration
+GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", os.getenv("GITHUB_TOKEN"))
+REPO_NAME = "Nirakshan"  # Change this to your repo name
+FILE_PATH = "activity_records.csv"
+
+# Initialize GitHub connection
+def get_github_repo():
+    if not GITHUB_TOKEN:
+        st.error("GitHub token not found. Please set GITHUB_TOKEN in secrets.")
+        return None
     try:
-        df = pd.read_csv('activity_records.csv', parse_dates=['Date'])
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
-        df = df.sort_values('Date').reset_index(drop=True)
-    except:
-        df = pd.DataFrame(columns=[
+        g = Github(GITHUB_TOKEN)
+        repo = g.get_user().get_repo(REPO_NAME)
+        return repo
+    except Exception as e:
+        st.error(f"Error connecting to GitHub: {e}")
+        return None
+
+# Load data from GitHub
+def load_data_from_github():
+    repo = get_github_repo()
+    if not repo:
+        return pd.DataFrame(columns=[
             'Date', 'Activity 1', 'Activity 1 proportion',
             'Activity 2', 'Activity 2 proportion',
             'Activity 3', 'Activity 3 proportion', 'Note'
         ])
-    return df
+    
+    try:
+        contents = repo.get_contents(FILE_PATH)
+        data = base64.b64decode(contents.content).decode('utf-8')
+        df = pd.read_csv(io.StringIO(data), parse_dates=['Date'])
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        df = df.sort_values('Date').reset_index(drop=True)
+        return df
+    except Exception as e:
+        st.warning(f"Creating new dataset: {e}")
+        return pd.DataFrame(columns=[
+            'Date', 'Activity 1', 'Activity 1 proportion',
+            'Activity 2', 'Activity 2 proportion',
+            'Activity 3', 'Activity 3 proportion', 'Note'
+        ])
 
-def save_data(df):
+# Save data to GitHub
+def save_data_to_github(df):
+    repo = get_github_repo()
+    if not repo:
+        return df
+    
     df = df.sort_values('Date').reset_index(drop=True)
-    df.to_csv('activity_records.csv', index=False)
+    csv_data = df.to_csv(index=False)
+    
+    try:
+        contents = repo.get_contents(FILE_PATH)
+        repo.update_file(contents.path, "Update activity records", csv_data, contents.sha)
+    except:
+        repo.create_file(FILE_PATH, "Create activity records", csv_data)
+    
     return df
 
 # Function to create pie chart
@@ -127,9 +170,10 @@ def create_pie_chart(df, time_period):
 
 # Main app
 def main():
-    df = load_data()
-    
     st.title("🌈 My Activity Tracker")
+    
+    # Load data
+    df = load_data_from_github()
     
     # Upper section - Pie chart
     with st.container():
@@ -137,7 +181,8 @@ def main():
         time_period = st.selectbox(
             "Select time period:",
             ["all records", "last week", "last month", "last 2 months", "last 6 months", "last year"],
-            index=0
+            index=0,
+            key="time_period"
         )
         create_pie_chart(df, time_period)
     
@@ -150,7 +195,8 @@ def main():
         selected_date = st.date_input(
             "Select Date:",
             value=yesterday,
-            max_value=yesterday
+            max_value=yesterday,
+            key="selected_date"
         )
         
         # Initialize session state for slider values if not exists
@@ -209,7 +255,7 @@ def main():
         )
         
         # Note field
-        note = st.text_area("Note (in any Indian language):", max_chars=500, height=100)
+        note = st.text_area("Note (in any Indian language):", max_chars=500, height=100, key='note')
         
         col1, col2, col3 = st.columns(3)
         
@@ -243,7 +289,7 @@ def main():
                     }])
                     df = pd.concat([df, new_record], ignore_index=True)
                 
-                df = save_data(df)
+                df = save_data_to_github(df)
                 st.success("Activity submitted successfully!")
         
         with col2:
@@ -270,7 +316,8 @@ def main():
                 label="Download Records",
                 data=csv,
                 file_name='activity_records.csv',
-                mime='text/csv'
+                mime='text/csv',
+                key='download_btn'
             )
 
 if __name__ == "__main__":
