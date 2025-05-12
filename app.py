@@ -9,7 +9,7 @@ import base64
 import os
 
 # Streamlit page configuration for child-friendly UI
-st.set_page_config(page_title="My Activity Tracker", page_icon="🌈", layout="centered")
+st.set_page_config(page_title="રોજિંદી દિનચર્યા", page_icon="🌈", layout="centered")
 st.markdown("""
     <style>
     body {background-color: #f0f8ff;}
