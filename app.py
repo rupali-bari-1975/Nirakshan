@@ -30,10 +30,7 @@ repo = g.get_user().get_repo(REPO_NAME)
 
 # Activity list (editable)
 activity_list = [
-    "Playing", "Cooking", "Drawing", "Research", "Traveling", "Reading", "Singing",
-    "Dancing", "Painting", "Writing", "Gardening", "Cycling", "Swimming", "Crafting",
-    "Photography", "Hiking", "Yoga", "Gaming", "Knitting", "Fishing", "Bird Watching",
-    "Coding", "Baking", "Sculpting", "Volunteering"
+    "પાપડ", "અથાણું", "ખેતી", "સંશોધન વિષય", "લેખન", "સ્વાસ્થ્ય", "ખાસ ખોરાક"
 ]
 
 # Function to read CSV from GitHub
@@ -73,9 +70,9 @@ if "loaded" not in st.session_state:
     st.session_state.loaded_note = ""
 
 # Upper Section: Pie Chart
-st.title("🌟 My Activity Pie Chart 🌟")
+st.title("🌟 રોજિંદા નિયમિત પાઇ ચાર્ટ 🌟")
 time_options = ["Last Week", "Last Month", "Last 2 Months", "Last 6 Months", "Last Year", "All Records"]
-time_range = st.selectbox("📅 Choose Time Period", time_options, index=5)
+time_range = st.selectbox("📅 તારીખ ચયન કરો", time_options, index=5)
 
 # Load data
 df = read_csv_from_github()
