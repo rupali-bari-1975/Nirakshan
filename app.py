@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 import seaborn as sns
 from datetime import datetime, timedelta
 from github import Github
@@ -27,6 +28,17 @@ REPO_NAME = "Nirakshan"
 CSV_FILE = "activity_records.csv"
 g = Github(GITHUB_TOKEN)
 repo = g.get_user().get_repo(REPO_NAME)
+
+# Path to the font file (relative to your project directory)
+font_path = "fonts/NotoSansGujarati-Regular.ttf"
+
+# Register the font with Matplotlib
+if os.path.exists(font_path):
+    font_manager.fontManager.addfont(font_path)
+    # Set the font family for Matplotlib
+    plt.rcParams["font.family"] = "Noto Sans Gujarati"
+else:
+    st.error("Font file not found. Please ensure 'fonts/NotoSansGujarati-Regular.ttf' is in the project directory.")
 
 # Activity list (editable)
 activity_list = [
@@ -106,19 +118,20 @@ if not df.empty:
                 activities[activity] = activities.get(activity, 0) + proportion
     
     # Prepare pie chart data
+    # Your existing code
     if activities:
         activity_df = pd.DataFrame(list(activities.items()), columns=["Activity", "Proportion"])
         activity_df = activity_df.sort_values(by="Proportion", ascending=False).head(10)
         total = activity_df["Proportion"].sum()
         activity_df["Percentage"] = (activity_df["Proportion"] / total * 100).round(2)
         activity_df = activity_df[activity_df["Percentage"] >= 1]
-        
+    
         # Plot pie chart
         plt.figure(figsize=(8, 6))
         colors = sns.color_palette("Set2", len(activity_df))
         plt.pie(activity_df["Percentage"], labels=activity_df["Activity"], autopct="%1.1f%%",
-                startangle=140, colors=colors, textprops={'fontsize': 12})
-        plt.title("My Activities", pad=30, fontsize=20, color="#ff4500")
+                startangle=140, colors=colors, textprops={'fontsize': 12, 'fontfamily': 'Noto Sans Gujarati'})
+        plt.title("મારી પ્રવૃત્તિઓ", pad=30, fontsize=20, color="#ff4500", fontfamily="Noto Sans Gujarati")
         st.pyplot(plt)
     else:
         st.write("No activities found for this time period.")
