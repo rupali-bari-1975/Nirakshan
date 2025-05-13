@@ -117,7 +117,8 @@ if not df.empty:
         # Set up font for Gujarati
         try:
             # Use a font that supports Gujarati, e.g., 'Noto Sans Gujarati'
-            font_path = "NotoSansGujarati-Regular.ttf"  # Path to the font file
+            # font_path = "NotoSansGujarati-Regular.ttf"  # Path to the font file
+            font_path = "Noto_Sans_Gujarati/NotoSansGujarati-VariableFont_wdth,2Cwght.ttf"
             prop = fm.FontProperties(fname=font_path)
         except:
             # Fallback to a system font that supports Gujarati
