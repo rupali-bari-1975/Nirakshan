@@ -112,12 +112,22 @@ if not df.empty:
         total = activity_df["Proportion"].sum()
         activity_df["Percentage"] = (activity_df["Proportion"] / total * 100).round(2)
         activity_df = activity_df[activity_df["Percentage"] >= 1]
+
+        # Set up font for Gujarati
+        try:
+            # Use a font that supports Gujarati, e.g., 'Noto Sans Gujarati'
+            font_path = "NotoSansGujarati-Regular.ttf"  # Path to the font file
+            prop = fm.FontProperties(fname=font_path)
+        except:
+            # Fallback to a system font that supports Gujarati
+            prop = fm.FontProperties(family="Noto Sans Gujarati", size=12)
+            st.warning("Custom font not found. Ensure 'NotoSansGujarati-Regular.ttf' is available or use a system font supporting Gujarati.")
         
         # Plot pie chart
         plt.figure(figsize=(8, 6))
         colors = sns.color_palette("Set2", len(activity_df))
         plt.pie(activity_df["Percentage"], labels=activity_df["Activity"], autopct="%1.1f%%",
-                startangle=140, colors=colors, textprops={'fontsize': 12})
+                startangle=140, colors=colors, textprops={'fontproperties': prop, 'fontsize': 12})
         plt.title("My Activities", pad=30, fontsize=20, color="#ff4500")
         st.pyplot(plt)
     else:
