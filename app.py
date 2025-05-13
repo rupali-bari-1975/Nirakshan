@@ -28,12 +28,6 @@ CSV_FILE = "activity_records.csv"
 g = Github(GITHUB_TOKEN)
 repo = g.get_user().get_repo(REPO_NAME)
 
-# Step 1: Load and register a Gujarati font
-# gujarati_font_path = "/usr/share/fonts/truetype/noto/NotoSansGujarati-Regular.ttf"  # Update this path
-gujarati_font_path = "/Noto_Sans_Gujarati/NotoSansGujarati-VariableFont_wdth,wght.ttf"
-gujarati_font = font_manager.FontProperties(fname=gujarati_font_path)
-plt.rcParams['font.family'] = gujarati_font.get_name()
-
 # Activity list (editable)
 activity_list = [
     "પાપડ", "અથાણું", "ખેતી", "સંશોધન વિષય", "લેખન", "સ્વાસ્થ્ય", "ખાસ વાનગી", "ખરીદી", "ચર્ચા", "આયોજન", "દુખની ઘટના", "ઘરની બહાર", "અન્ય", "કંઈ નથી"
@@ -123,7 +117,7 @@ if not df.empty:
         plt.figure(figsize=(8, 6))
         colors = sns.color_palette("Set2", len(activity_df))
         plt.pie(activity_df["Percentage"], labels=activity_df["Activity"], autopct="%1.1f%%",
-                startangle=140, colors=colors, textprops={'fontsize': 12, "Fontproperties": gujarati_font})
+                startangle=140, colors=colors, textprops={'fontsize': 12})
         plt.title("My Activities", pad=30, fontsize=20, color="#ff4500")
         st.pyplot(plt)
     else:
