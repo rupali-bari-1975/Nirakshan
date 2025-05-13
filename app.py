@@ -30,7 +30,7 @@ g = Github(GITHUB_TOKEN)
 repo = g.get_user().get_repo(REPO_NAME)
 
 # Path to the font file (relative to your project directory)
-font_path = "fonts/NotoSansGujarati-Regulars.ttf"
+font_path = "fonts/NotoSansGujarati-Regular.ttf"
 
 # Register the font with Matplotlib
 if os.path.exists(font_path):
