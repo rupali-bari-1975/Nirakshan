@@ -131,7 +131,7 @@ if not df.empty:
         colors = sns.color_palette("Set2", len(activity_df))
         plt.pie(activity_df["Percentage"], labels=activity_df["Activity"], autopct="%1.1f%%",
                 startangle=140, colors=colors, textprops={'fontsize': 12, 'fontfamily': 'Noto Sans Gujarati'})
-        plt.title("મારી પ્રવૃત્તિઓ", pad=30, fontsize=20, color="#ff4500", fontfamily="Noto Sans Gujarati")
+        plt.title("મારી દિનચર્યા", pad=30, fontsize=22, color="#ff4500", fontfamily="Noto Sans Gujarati")
         st.pyplot(plt)
     else:
         st.write("No activities found for this time period.")
