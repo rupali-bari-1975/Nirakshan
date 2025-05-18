@@ -8,6 +8,7 @@ from github import Github
 import io
 import base64
 import os
+import random
 
 # Streamlit page configuration for child-friendly UI
 st.set_page_config(page_title="રોજિંદી દિનચર્યા", page_icon="🌈", layout="centered")
@@ -128,7 +129,10 @@ if not df.empty:
     
         # Plot pie chart
         plt.figure(figsize=(8, 6))
-        colors = sns.color_palette("Set2", len(activity_df))
+        # colors = sns.color_palette("Set2", len(activity_df))
+        random.seed(42)
+        colors = sns.color_palette("hls", len(activity_df))
+        random.shuffle(colors)
         plt.pie(activity_df["Percentage"], labels=activity_df["Activity"], autopct="%1.1f%%",
                 startangle=140, colors=colors, textprops={'fontsize': 12, 'fontfamily': 'Noto Sans Gujarati'})
         plt.title("મારી દિનચર્યા", pad=30, fontsize=22, color="#ff4500", fontfamily="Noto Sans Gujarati")
